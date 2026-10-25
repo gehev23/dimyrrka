@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Собери воспоминания: бип в носик 🧩💖</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+ html, body { min-height: 100%; }
+ body { overflow-y: auto; }
+  body {
+    min-height: 100vh;
+    font-family: 'Segoe UI', sans-serif;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 20px; user-select: none;
+    overflow-x: hidden;
+    position: relative;
+    background: #2b1055;
+
+    /* 👇 ФОН задаётся через JS (гифка/картинка/градиент) */
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    transition: background 0.8s ease;
+  }
+
+  /* затемнение поверх фона, чтобы пазл читался */
+  #bgOverlay {
+    position: fixed; inset: 0;
+    background: rgba(13, 2, 33, 0.45);
+    z-index: 1;
+    pointer-events: none;
+    transition: background 0.8s ease;
+  }
+
+  .content {
+    position: relative;
+    z-index: 2;
+    display: flex; flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+
+  h1 {
+    color: #fff; margin-bottom: 5px; font-size: 26px;
+    text-shadow: 0 0 20px rgba(255,77,109,0.9), 0 2px 6px rgba(0,0,0,0.6);
+    text-align: center;
+  }
+  #levelInfo {
+    color: #ffd60a; font-size: 16px; margin-bottom: 12px;
+    font-weight: bold; text-align: center; letter-spacing: 1px;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.8);
+  }
+  #status {
+    color: #fff; font-size: 16px; margin-bottom: 12px;
+    min-height: 22px; text-align: center;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.8);
+  }
+
+  #progressBar {
+    width: 360px; height: 8px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 10px; margin-bottom: 15px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  }
+  #progressFill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, #ff4d6d, #ffd60a);
+    border-radius: 10px;
+    transition: width 0.5s ease;
+  }
+
+  #board {
+    position: relative;
+    width: 360px; height: 360px;
+    background: rgba(0,0,0,0.35);
+    border: 2px dashed rgba(255,255,255,0.4);
+    border-radius: 16px;
+    display: grid;
+    gap: 2px; padding: 2px;
+    box-shadow: 0 15px 50px rgba(0,0,0,0.5);
+    backdrop-filter: blur(2px);
+  }
+  .slot {
+    background: rgba(255,255,255,0.08);
+    border-radius: 6px;
+    position: relative;
+  }
+  .slot.filled { background: transparent; }
+
+  .piece {
+    position: absolute;
+    border-radius: 6px;
+    cursor: grab;
+    transition: box-shadow 0.15s, transform 0.1s;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    z-index: 10;
+    background-repeat: no-repeat;
+  }
+  .piece:active { cursor: grabbing; }
+  .piece.dragging {
+    z-index: 100;
+    box-shadow: 0 10px 30px rgba(255,77,109,0.9);
+    transform: scale(1.05);
+  }
+  .piece.placed {
+    cursor: default;
+    box-shadow: none;
+    z-index: 1;
+  }
+
+  #tray {
+    position: relative;
+    width: 360px; min-height: 120px;
+    margin-top: 18px;
+    background: rgba(0,0,0,0.35);
+    border-radius: 16px;
+    padding: 10px;
+    display: flex; flex-wrap: wrap; gap: 6px;
+    justify-content: center;
+    transition: 0.3s;
+    backdrop-filter: blur(2px);
+  }
+  #tray.hidden { opacity: 0; transform: scale(0.9); pointer-events: none; }
+
+  #modal {
+    position: fixed; inset: 0;
+    background: rgba(13,2,33,0.9);
+    backdrop-filter: blur(10px);
+    display: none; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 200; text-align: center; padding: 30px;
+    animation: fadeIn 0.4s ease;
+    overflow-y: auto;
+  }
+  #modal.show { display: flex; }
+
+  .modal-card {
+    background: linear-gradient(#a24115, #d6693a, #ee9469);
+    border-radius: 30px;
+    padding: 35px 40px;
+    max-width: 420px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    border: 2px solid rgba(255,255,255,0.3);
+    animation: pop 0.5s ease;
+    text-align: center;
+  }
+
+  .modal-heart {
+    font-size: 60px;
+    margin-bottom: 10px;
+    animation: pulse 1.2s infinite;
+  }
+
+  #modal h2 { color: #fff; margin-bottom: 15px; }
+  #modal p { color: #fff; margin-bottom: 25px; line-height: 1.6; white-space: pre-line; }
+  #modal button {
+    display: inline-block;
+    background: #3b1108;
+    color: #fff;
+    border: none;
+    padding: 14px 36px;
+    border-radius: 40px;
+    font-size: 17px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 6px 20px rgba(255,77,109,0.6);
+    margin-top: 10px;
+    width: auto;
+    max-width: 100%;
+}
+  #modal button:hover {
+    transform: scale(1.06);
+    box-shadow: 0 10px 30px rgba(255,77,109,0.9);
+}
+
+/* анимации */
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+}
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes pop {
+    0% { transform: scale(0.5); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+  }
+  button {
+  background: transparent;
+  color: #ff4d6d;
+  border: 2px solid #ff4d6d;
+  padding: 14px 36px;
+  border-radius: 12px;
+  font-size: 17px; font-weight: bold;
+  cursor: pointer; transition: 0.2s;
+  }
+  button:hover {
+  background: #ff4d6d;
+  color: #fff;
+  transform: scale(1.05);
+  }
+
+/* С эмодзи перед текстом */
+  button::before { content: '💖 '; }
+  .heart {
+    position: fixed; font-size: 30px; pointer-events: none;
+    animation: floatUp 3s ease-out forwards;
+    z-index: 150;
+  }
+  @keyframes floatUp {
+    0% { transform: translateY(0) scale(0.5); opacity: 0; }
+    20% { opacity: 1; }
+    100% { transform: translateY(-100vh) scale(1.3); opacity: 0; }
+  }
+
+  @media (max-width: 420px) {
+    #board, #tray, #progressBar { width: 300px; }
+    #board { height: 300px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="bgOverlay"></div>
+
+<div class="content">
+  <h1>Собери воспоминания 🧩💖</h1>
+  <div id="progressBar"><div id="progressFill"></div></div>
+  <div id="levelInfo">Уровень 1 из 3</div>
+  <div id="status">Перетаскивай эти хуйни на поле 👇</div>
+
+  <div id="board"></div>
+  <div id="tray"></div>
+</div>
+
+<div id="modal">
+  <div class="modal-card">
+    <div class="modal-heart">💖</div>
+    <h2 id="modalTitle"></h2>
+    <p id="modalText"></p>
+    <button id="modalBtn"></button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// 👇 ЗАМЕНИ ПОД СЕБЯ:
+// image  — картинка для пазла (фото рядом или ссылка)
+// grid   — сложность (2, 3, 4, 5)
+// bg     — ФОН уровня: гифка 'cat.gif', картинка 'bg.jpg'
+//          или градиент 'linear-gradient(...)'
+// overlay — затемнение фона (0–1)
+// ============================================================
+const LEVELS = [
+  {
+    image: 'fy.jpg',        // 👈 фото для пазла
+    grid: 2,
+    bg: 'https://media.tenor.com/qyixoF-GRfQAAAAM/бесконечноелето-everlasting-summer.gif',              // 🖼️ ГИФКА-фон (или 'bg1.jpg', или градиент)
+    overlay: 0.4,
+    afterTitle: 'Ленка готова к новым свершениям!! 🎉',
+    afterText: 'Умница огромный, Димушка\nДавай к следующему 😉'
+  },
+  {
+    image: 'isy.jpg',
+    grid: 3,
+    bg: 'https://media1.tenor.com/m/ISRt_1gNZzAAAAAd/machairas-church.gif',              // 🖼️ картинка-фон
+    overlay: 0.5,
+    afterTitle: 'Спасибо за это пожелание тогда)) 💪',
+    afterText: 'Умничкин 🥰\nЩа послежний уровень будет'
+  },
+  {
+    image: 'https://images.steamusercontent.com/ugc/16702135167980864344/A665AA2C6D780236AB40755D47EA2FB8FB51C692/?imw=5000&imh=5000&ima=fit&impolicy=Letterbox&imcolor=%23000000&letterbox=false',
+    grid: 4,
+    bg: 'https://img4.teletype.in/files/f9/16/f916bcd7-020a-4836-909e-238fe1a6f559.png',  // 🌈 градиент
+    overlay: 0.2,
+    afterTitle: 'Еееее все сделал!!🏆',
+    afterText: 'Спасибо,что рассказал о Санаби 🎉\n\n Я тебя очень люблю! 💖'
+  }
+];
+// 💡 Можно смешивать: гифка, картинка, градиент — у каждого уровня свой bg.
+
+const BOARD_SIZE = 360;
+const bgOverlay = document.getElementById('bgOverlay');
+
+let currentLevel = 0;
+let grid, pieceSize, totalPieces;
+let placedCount = 0;
+let slots = [];
+let board, tray, statusEl, levelInfo, progressFill, modal;
+
+// ---- Применяем фон уровня ----
+function applyBackground(level) {
+  const bg = level.bg || '#2b1055';
+
+  const isImage = /^(https?:|\/|\.\/|\.\.\/)/.test(bg) ||
+                  /\.(jpg|jpeg|png|webp|gif|svg)(\?.*)?$/i.test(bg);
+
+  if (isImage) {
+    // 🖼️ гифка / картинка — как фон body
+    document.body.style.background = `url('${bg}') center/cover no-repeat fixed`;
+  } else {
+    // 🌈 градиент или цвет
+    document.body.style.background = bg;
+    document.body.style.backgroundSize = 'cover';
+  }
+
+  bgOverlay.style.background = `rgba(13, 2, 33, ${level.overlay ?? 0.45})`;
+}
+
+// ---- Запуск уровня ----
+function startLevel(levelIndex) {
+  currentLevel = levelIndex;
+  const level = LEVELS[levelIndex];
+  grid = level.grid;
+  totalPieces = grid * grid;
+  pieceSize = BOARD_SIZE / grid;
+  placedCount = 0;
+
+  board = document.getElementById('board');
+  tray = document.getElementById('tray');
+  statusEl = document.getElementById('status');
+  levelInfo = document.getElementById('levelInfo');
+  progressFill = document.getElementById('progressFill');
+  modal = document.getElementById('modal');
+
+  applyBackground(level);
+
+  board.innerHTML = '';
+  tray.innerHTML = '';
+  tray.classList.remove('hidden');
+  slots = [];
+
+  board.style.gridTemplateColumns = `repeat(${grid}, 1fr)`;
+  board.style.gridTemplateRows = `repeat(${grid}, 1fr)`;
+
+  levelInfo.textContent = `Уровень ${levelIndex + 1} из ${LEVELS.length}: ${grid}×${grid}`;
+  statusEl.textContent = 'Перетаскивай эти хуйни на поле 👇';
+  progressFill.style.width = ((levelIndex) / LEVELS.length * 100) + '%';
+
+  for (let i = 0; i < totalPieces; i++) {
+    const slot = document.createElement('div');
+    slot.className = 'slot';
+    slot.dataset.index = i;
+    board.appendChild(slot);
+    slots.push(slot);
+  }
+
+  const pieces = [];
+  for (let i = 0; i < totalPieces; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'piece';
+    piece.dataset.index = i;
+
+    const row = Math.floor(i / grid);
+    const col = i % grid;
+
+    piece.style.backgroundImage = `url('${level.image}')`;
+    piece.style.backgroundSize = `${BOARD_SIZE}px ${BOARD_SIZE}px`;
+    piece.style.backgroundPosition = `-${col * pieceSize}px -${row * pieceSize}px`;
+    piece.style.width = pieceSize + 'px';
+    piece.style.height = pieceSize + 'px';
+
+    pieces.push(piece);
+  }
+
+  shuffle(pieces).forEach(p => {
+    p.style.position = 'relative';
+    tray.appendChild(p);
+  });
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// ============================================================
+// DRAG & DROP
+// ============================================================
+let dragged = null;
+let dragOffsetX = 0, dragOffsetY = 0;
+
+function startDrag(piece, clientX, clientY) {
+  if (piece.classList.contains('placed')) return;
+  dragged = piece;
+  piece.classList.add('dragging');
+
+  const rect = piece.getBoundingClientRect();
+  dragOffsetX = clientX - rect.left;
+  dragOffsetY = clientY - rect.top;
+
+  piece.style.position = 'fixed';
+  piece.style.left = (clientX - dragOffsetX) + 'px';
+  piece.style.top = (clientY - dragOffsetY) + 'px';
+  piece.style.width = pieceSize + 'px';
+  piece.style.height = pieceSize + 'px';
+  document.body.appendChild(piece);
+}
+
+function moveDrag(clientX, clientY) {
+  if (!dragged) return;
+  dragged.style.left = (clientX - dragOffsetX) + 'px';
+  dragged.style.top = (clientY - dragOffsetY) + 'px';
+
+  const slot = getSlotUnder(clientX, clientY);
+  slots.forEach(s => s.style.outline = '');
+  if (slot && !slot.classList.contains('filled')) {
+    slot.style.outline = '3px solid #ffd60a';
+  }
+}
+
+function endDrag(clientX, clientY) {
+  if (!dragged) return;
+  const piece = dragged;
+  dragged = null;
+  piece.classList.remove('dragging');
+  slots.forEach(s => s.style.outline = '');
+
+  const slot = getSlotUnder(clientX, clientY);
+
+  if (slot && !slot.classList.contains('filled')) {
+    if (parseInt(piece.dataset.index) === parseInt(slot.dataset.index)) {
+      placePiece(piece, slot);
+    } else {
+      returnToTray(piece);
+      statusEl.textContent = 'Не, не вставляется. Давай другое 🤔';
+      setTimeout(() => {
+        if (placedCount < totalPieces) statusEl.textContent = `Собрано ${placedCount} из ${totalPieces}`;
+      }, 1500);
+    }
+  } else {
+    returnToTray(piece);
+  }
+}
+
+function getSlotUnder(x, y) {
+  return slots.find(slot => {
+    const r = slot.getBoundingClientRect();
+    return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+  });
+}
+
+function placePiece(piece, slot) {
+  piece.classList.add('placed');
+  slot.appendChild(piece);
+  piece.style.position = 'absolute';
+  piece.style.left = '0';
+  piece.style.top = '0';
+  piece.style.width = pieceSize + 'px';
+  piece.style.height = pieceSize + 'px';
+  slot.classList.add('filled');
+
+  placedCount++;
+  statusEl.textContent = `Собрано ${placedCount} из ${totalPieces} ✅`;
+
+  if (placedCount === totalPieces) {
+    setTimeout(() => levelComplete(), 400);
+  }
+}
+
+function returnToTray(piece) {
+  piece.style.position = 'relative';
+  piece.style.left = '';
+  piece.style.top = '';
+  piece.style.width = pieceSize + 'px';
+  piece.style.height = pieceSize + 'px';
+  tray.appendChild(piece);
+}
+
+document.addEventListener('mousedown', (e) => {
+  const piece = e.target.closest('.piece');
+  if (!piece || piece.classList.contains('placed')) return;
+  e.preventDefault();
+  startDrag(piece, e.clientX, e.clientY);
+});
+document.addEventListener('mousemove', (e) => {
+  if (dragged) { e.preventDefault(); moveDrag(e.clientX, e.clientY); }
+});
+document.addEventListener('mouseup', (e) => {
+  if (dragged) endDrag(e.clientX, e.clientY);
+});
+
+document.addEventListener('touchstart', (e) => {
+  const piece = e.target.closest('.piece');
+  if (!piece || piece.classList.contains('placed')) return;
+  e.preventDefault();
+  const t = e.touches[0];
+  startDrag(piece, t.clientX, t.clientY);
+}, { passive: false });
+
+document.addEventListener('touchmove', (e) => {
+  if (dragged) {
+    e.preventDefault();
+    const t = e.touches[0];
+    moveDrag(t.clientX, t.clientY);
+  }
+}, { passive: false });
+
+document.addEventListener('touchend', (e) => {
+  if (dragged) {
+    const t = e.changedTouches[0];
+    endDrag(t.clientX, t.clientY);
+  }
+});
+
+// ============================================================
+// ЗАВЕРШЕНИЕ УРОВНЯ
+// ============================================================
+function levelComplete() {
+  const level = LEVELS[currentLevel];
+  progressFill.style.width = ((currentLevel + 1) / LEVELS.length * 100) + '%';
+
+  celebrate();
+
+  const isLast = currentLevel === LEVELS.length - 1;
+
+  document.getElementById('modalTitle').textContent = level.afterTitle;
+  document.getElementById('modalText').textContent = level.afterText;
+
+  const btn = document.getElementById('modalBtn');
+  if (isLast) {
+    btn.textContent = 'Собрать еще разок 🔁';
+    btn.onclick = () => {
+      modal.classList.remove('show');
+      startLevel(0);
+    };
+  } else {
+    btn.textContent = 'Следующий уровень →';
+    btn.onclick = () => {
+      modal.classList.remove('show');
+      startLevel(currentLevel + 1);
+    };
+  }
+
+  setTimeout(() => modal.classList.add('show'), 300);
+}
+
+function celebrate() {
+  for (let i = 0; i < 25; i++) {
+    setTimeout(() => {
+      const h = document.createElement('div');
+      h.className = 'heart';
+      h.textContent = ['❤️','💖','💕','💘','✨','🎉'][Math.floor(Math.random() * 6)];
+      h.style.left = Math.random() * 100 + 'vw';
+      h.style.bottom = '0';
+      h.style.fontSize = (20 + Math.random() * 30) + 'px';
+      h.style.animationDuration = (2 + Math.random() * 2) + 's';
+      document.body.appendChild(h);
+      setTimeout(() => h.remove(), 4000);
+    }, i * 80);
+  }
+}
+
+startLevel(0);
+</script>
+</body>
+</html>
